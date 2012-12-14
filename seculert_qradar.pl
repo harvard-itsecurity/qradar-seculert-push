@@ -42,6 +42,7 @@
 # 		with HTTPS 'CONNECT' calls over a Proxy. Please see the notes
 # 		within the script.
 #	You have dropped public ssh key under: $qradar_console:/root/.ssh/authorized_keys2
+#   You have dropped private ssh key under: $seculert_dir/qr-id_dsa
 
 use Date::Calc qw(Add_Delta_DHMS);
 
@@ -64,8 +65,11 @@ my $seculert_qradar_list = "$seculert_dir/seculert.txt";
 # NOTE: You must have an SSH key set for 'root'
 my $qradar_console = 'qradar-console.domain.com';
 my $qradar_ssh_key = "$seculert_dir/qr-id_dsa";
+
+# Don't need to modify knownhosts
 my $qradar_ssh_knownhosts = "$seculert_dir/known_hosts";
 
+# Don't need to modify days_back
 # Number of days to go back for Malicious IPs "LastSeen"
 # NOTE: This means IPs that have been "LastSeen" 31 days ago will NOT
 # be included in the final IP list.
@@ -75,6 +79,7 @@ my $days_back = 30;
 #	'1' = Crime Servers
 #	'2' = Threat Intelligence Records
 
+# Don't need to modify seculert_types - includes both by default
 # List any combination of just '1', '1 and 2', or just '2'
 # Examples: (1) or (1,2) or (2,1) or (2)
 my @seculert_types = (1,2);

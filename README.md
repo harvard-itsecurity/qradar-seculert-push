@@ -34,9 +34,11 @@ script.
 
 2.) You have dropped public ssh key under: $qradar_console:/root/.ssh/authorized_keys2
 
-3.) You will add your environment variables in the '# START USER CONFIG' section
+3.) You have dropped private ssh key under: $seculert_dir/qr-id_dsa
 
-4.) Per the code, you are only looking back 30 days in terms of the
+4.) You will add your environment variables in the '# START USER CONFIG' section
+
+5.) Per the code, you are only looking back 30 days in terms of the
 Seculert feed. This is because something could be 'first seen' 5+ months ago
 and then fixed a month later, and last seen '4+' months ago. It would
 produce false results if we just blanket target everything.

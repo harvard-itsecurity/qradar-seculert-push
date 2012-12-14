@@ -76,3 +76,10 @@ Contact?
 If you need help setting this up or you find bugs, please feel free to
 contact me: ventz_petkov@harvard.edu (or just fork a copy and fix the
 issue :))
+
+
+
+Credits?
+--------
+Xavier Ashe - without his input on the QRadar deployment trigger I
+would have never been able to get this to work fully automatically.

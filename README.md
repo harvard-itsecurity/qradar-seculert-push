@@ -15,7 +15,7 @@ You need to go into 'seculert_qradar.pl' and edit the '#START USER
 CONFIG' section. The first variable you will see is the "seculert" api
 key - which you can get from your Seculert account (fantastic service
 http://seculert.com), but again, this can be easily be any
-CSV list. The idea is that you download both feeds and convert them
+CSV list. (Please see bellow about CSV) The idea is that you download both feeds and convert them
 into the "IP" format that QRadar understands with the "Network" (in
 this case 'SECULERT') ID and the Sub-ID (in this case 'CS' and 'TIR').
 Then you pull the existing remotenet.conf file, and prune out the old
@@ -78,6 +78,40 @@ Contact?
 If you need help setting this up or you find bugs, please feel free to
 contact me: ventz_petkov@harvard.edu (or just fork a copy and fix the
 issue :))
+
+
+
+How can I modify this so that I can input any CSV?
+--------------------------------------------------
+At minimum, JUST to get it to work "as is", you would have to at least take out this block:
+
+```perl
+for my $seculert_type (@seculert_types) {
+...
+}
+```
+
+
+Let's say your CSV looks like this: hostname, ip, something1, something2"
+
+$source would be the SOURCE name/label of the Ips
+$type_description  would be the sub-name/sub-label of the SOURCE for the Ips
+
+and modify it with:
+
+```perl
+my $source = 'BAD-IP-Addresses';
+my $type_description = 'honeypots';
+
+open(FP, 'your-csv-file.csv')
+for my $line (<FP>) {
+	my ($hostname, $ip, $something1, $something2) = split(/,/, $line);
+	print OUT "$source $type_description $ip #FF0000 0 90  29\n";
+}
+close(FP);
+```
+
+Soon to come: URL for modified version.
 
 
 

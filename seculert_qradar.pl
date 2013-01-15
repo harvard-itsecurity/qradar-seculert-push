@@ -33,7 +33,7 @@
 # By: Ventz Petkov (ventz_petkov@harvard.edu)
 # License: BSD 3
 # Date: 12-11-12
-# Last: 12-14-12
+# Last: 01-15-13
 # Comment: Push "BAD" IPs/Networks into QRadar's "Remote Networks",
 # tag them properly, and use them!
 # Assumptions:
@@ -55,7 +55,7 @@ my $seculert_api_key = 'API-KEY';
 # valid formats:
 #	'0' - disable proxy
 #	'1' - enable proxy
-$proxy = 1;
+$proxy = 0;
 $proxy_url = 'http://proxy.domain.com:8080';
 
 # Seculert default work dir and "bad ip" file for qradar
@@ -114,7 +114,7 @@ for my $seculert_type (@seculert_types) {
 	}
 	elsif($seculert_type == 2) {
 		$type_description = 'TIR';
-		 $seculert_api_url = "https://portal.seculert.com/getinfo.aspx?key=$seculert_api_key&format=sys&type=$seculert_type&filter={'f_0_field':'Timestamp','f_0_data_type':'date','f_0_data_comparison':'gt','f_0_data_value':'$date_back'}&field=Timestamp&dir=DESC";
+		$seculert_api_url = "https://portal.seculert.com/getinfo.aspx?key=$seculert_api_key&format=sys&type=$seculert_type&filter={'f_0_field':'Timestamp','f_0_data_type':'date','f_0_data_comparison':'gt','f_0_data_value':'$date_back'}&field=Timestamp&dir=DESC";
 	}
 
 	

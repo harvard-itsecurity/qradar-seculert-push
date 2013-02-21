@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #############################################################################
-# Copyright (c) 2012, Harvard University IT Security - Ventz Petkov <ventz_petkov@harvard.edu>
+# Copyright (c) 2013, Harvard University IT Security - Ventz Petkov <ventz_petkov@harvard.edu>
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
 # By: Ventz Petkov (ventz_petkov@harvard.edu)
 # License: BSD 3
 # Date: 12-11-12
-# Last: 01-15-13
+# Last: 02-21-13
 # Comment: Push "BAD" IPs/Networks into QRadar's "Remote Networks",
 # tag them properly, and use them!
 # Assumptions:
@@ -104,6 +104,7 @@ my $date_back = "$bmonth/$bday/$byear";
 # Our QRadar result file
 open(OUT, ">>$seculert_qradar_list");
 
+print "Downloading from Seculert API...\n";
 for my $seculert_type (@seculert_types) {
 	# Get a human readable description
 	my $type_description = '';
@@ -125,10 +126,11 @@ for my $seculert_type (@seculert_types) {
 	# Also, Crypt::SSLeay doesn't seem to work as advertised and
 	# that's one of the few solutions that should work
 	# IF Anyone can figure out how to fix this, please email me: ventz@vpetkov.net
-	if($proxy) { $ENV{'HTTPS_PROXY'} = "$proxy_url"; }
+	if($proxy) { $ENV{'https_proxy'} = "$proxy_url"; }
 	my @page = `lynx -dump \"$seculert_api_url\"`;
 
 
+	print "Writing QRadar format...\n";
 	for my $line (@page) {
 		my ($hostname, $ip, $first_seen, $last_seen) = split(/,/, $line);
 		$ip =~ s/"//g; $ip .= '/32';
@@ -138,18 +140,22 @@ for my $seculert_type (@seculert_types) {
 
 close(OUT);
 
+print "Sending to QRadar...\n";
 # SSH To QRadar's Console and push out file + trigger update
 `scp -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console:/store/configservices/staging/globalconfig/remotenet.conf .`;
 `sed -i -e '/^SECULERT/d' remotenet.conf`;
 `cat $seculert_qradar_list >> remotenet.conf`;
 `scp -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no remotenet.conf root\@$qradar_console:/store/configservices/staging/globalconfig/remotenet.conf`;
 
+print "Cleaning up...\n";
 # Remove our SECULERT list and the newly pushed out qradar conf
 unlink($seculert_qradar_list); unlink ('remotenet.conf');
 
+print "Initializing QRadar slurp...\n";
 # QRadar magic
 my $host_token = `ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'cat /opt/qradar/conf/host.token'`;
 `ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'wget -q -O - --header "SEC:$host_token" --no-check-certificate \"https://localhost/console/JSON-RPC?{id:'',method:'QRadar.scheduleDeployment',params:[{fullDeploy:false},{queued:false}]}\"'`;
+print "Complete!\n\n"
 
 
 1;

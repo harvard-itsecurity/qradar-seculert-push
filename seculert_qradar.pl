@@ -151,10 +151,10 @@ print "Cleaning up...\n";
 # Remove our SECULERT list and the newly pushed out qradar conf
 unlink($seculert_qradar_list); unlink ('remotenet.conf');
 
-print "Initializing QRadar slurp...\n";
+print "Deploying in QRadar...\n";
 # QRadar magic
 my $host_token = `ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'cat /opt/qradar/conf/host.token'`;
-`ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'wget -q -O - --header "SEC:$host_token" --no-check-certificate \"https://localhost/console/JSON-RPC?{id:'',method:'QRadar.scheduleDeployment',params:[{fullDeploy:false},{queued:false}]}\"'`;
+`ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'wget -q -O - --header "SEC:$host_token" --no-check-certificate \"https://localhost/console/JSON-RPC?{id:\"\",method:\"QRadar.scheduleDeployment\",params:[{fullDeploy:false},{queued:false}]}\"'`;
 print "Complete!\n\n"
 
 

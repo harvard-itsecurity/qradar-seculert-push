@@ -33,7 +33,7 @@
 # By: Ventz Petkov (ventz_petkov@harvard.edu)
 # License: BSD 3
 # Date: 12-11-12
-# Last: 02-21-13
+# Last: 08-18-13
 # Comment: Push "BAD" IPs/Networks into QRadar's "Remote Networks",
 # tag them properly, and use them!
 # Assumptions:
@@ -134,6 +134,14 @@ for my $seculert_type (@seculert_types) {
 	for my $line (@page) {
 		my ($hostname, $ip, $first_seen, $last_seen) = split(/,/, $line);
 		$ip =~ s/"//g; $ip .= '/32';
+        # QRadar remotenet.conf syntax (per IBM support):
+        # 1 - Name
+        # 2 - Sub-Name
+        # 3 - IP Address
+        # 4 - is colour, deprecated
+        # 5 - database length, deprecated
+        # 6 - asset weight, deprecated
+        # 7 - an ID for the 'record' each unique name pair (first 2 columns)    gets an ID
 		print OUT "SECULERT $type_description $ip #FF0000 0 90  29\n";
 	}
 }
@@ -151,12 +159,10 @@ print "Cleaning up...\n";
 # Remove our SECULERT list and the newly pushed out qradar conf
 unlink($seculert_qradar_list); unlink ('remotenet.conf');
 
-print "Deploying in QRadar...\n";
+print "Deploying in QRadar...(takes time to complete)\n";
 # QRadar magic
-my $host_token = `ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'cat /opt/qradar/conf/host.token'`;
-`ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console 'wget -q -O - --header "SEC:$host_token" --no-check-certificate \"https://localhost/console/JSON-RPC?{id:\"\",method:\"QRadar.scheduleDeployment\",params:[{fullDeploy:false},{queued:false}]}\"'`;
-print "Complete!\n\n"
-
+`ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console /opt/qradar/upgrade/util/setup/upgrades/do_deploy.pl`;
+print "Complete!\n\n";
 
 1;
 

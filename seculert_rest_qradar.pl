@@ -33,7 +33,7 @@
 # By: Ventz Petkov (ventz_petkov@harvard.edu)
 # License: BSD 3
 # Date: 12-11-12
-# Last: 08-18-13
+# Last: 10-26-13
 # Comment: Push "BAD" IPs/Networks into QRadar's "Remote Networks",
 # tag them properly, and use them!
 # Assumptions:
@@ -43,43 +43,49 @@
 # 		within the script.
 #	You have dropped public ssh key under: $qradar_console:/root/.ssh/authorized_keys2
 #   You have dropped private ssh key under: $seculert_dir/qr-id_dsa
+#   You have set: $seculert_api_key | $qradar_console_host | $proxy and $proxy_url (optional)
+
+#!/usr/bin/perl -w
+use strict;
 
 use Date::Calc qw(Add_Delta_DHMS);
+use JSON;
+# (Ubuntu: libjson-perl)
 
 #####################################################################
 # START USER CONFIG #
 
-my $seculert_api_key = 'API-KEY';
+# MUST change to get started:
+# $seculert_api_key | $qradar_console_host | $proxy and $proxy_url (optional)
+
+my $seculert_api_key = 'SECULERT-API-KEY-CHANGEME';
+my $securlert_api_url = 'https://seculert-prod.apigee.net/v2';
 
 # Proxy used to reach SECULERT API Only
 # valid formats:
 #	'0' - disable proxy
 #	'1' - enable proxy
-$proxy = 0;
-$proxy_url = 'http://proxy.domain.com:8080';
+my $proxy = 1;
+my $proxy_url = 'http://proxy.domain.tld:8080';
 
 # Seculert default work dir and "bad ip" file for qradar
 my $seculert_dir = '/usr/local/seculert';
 my $seculert_qradar_list = "$seculert_dir/seculert.txt";
 
 # NOTE: You must have an SSH key set for 'root'
-my $qradar_console = 'qradar-console.domain.com';
+my $qradar_console = 'qradar-console.domain.tld';
 my $qradar_ssh_key = "$seculert_dir/qr-id_dsa";
-
-# Don't need to modify knownhosts
 my $qradar_ssh_knownhosts = "$seculert_dir/known_hosts";
 
-# Don't need to modify days_back
-# Number of days to go back for Malicious IPs "LastSeen"
-# NOTE: This means IPs that have been "LastSeen" 31 days ago will NOT
+# Number of days to go back for Malicious IPs "last-seen"
+# NOTE: This means IPs that have been "last-seen" 31 days ago will NOT
 # be included in the final IP list.
 my $days_back = 30;
 
 # valid types:
 #	'1' = Crime Servers
-#	'2' = Threat Intelligence Records
+#	'2' = Botnet Interception Records
 
-# Don't need to modify seculert_types - includes both by default
 # List any combination of just '1', '1 and 2', or just '2'
 # Examples: (1) or (1,2) or (2,1) or (2)
 my @seculert_types = (1,2);
@@ -91,59 +97,73 @@ chdir($seculert_dir);
 
 
 # Grab Today's date
-($s,$m,$h,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+my ($s,$m,$h,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
 $month += 1; $year += 1900;
 
 # Back days - grab ONLY information for last-seen that's at least from
 # -$days_back. See top '$days_back' for additional information.
 my ($byear, $bmonth, $bday, $bhour, $bmin, $bsecond) = Add_Delta_DHMS($year, $month, $day, $h, $m, $s, -$days_back, 0, 0, 0); 
 
+
+# Format Year, Month, Date - proper # of digits:
+$byear = sprintf("%04d", $byear);
+$bmonth = sprintf("%02d", $bmonth);
+$bday = sprintf("%02d", $bday);
+
+$year = sprintf("%04d", $year);
+$month = sprintf("%02d", $month);
+$day = sprintf("%02d", $day);
+
 # Format it for Seculert API
-my $date_back = "$bmonth/$bday/$byear";
+my $from_date = "$byear-$bmonth-$bday";
+my $to_date = "$year-$month-$day";
 
 # Our QRadar result file
 open(OUT, ">>$seculert_qradar_list");
 
 print "Downloading from Seculert API...\n";
 for my $seculert_type (@seculert_types) {
-	# Get a human readable description
-	my $type_description = '';
-	my $seculert_api_url = '';
+	my $type_description;
+	my $seculert_api_url;
+    my $json_container_name;
+    my $json_ip_field_name;
+
 	if($seculert_type == 1) {
 		$type_description = 'CS';
-		$seculert_api_url = "https://portal.seculert.com/getinfo.aspx?key=$seculert_api_key&format=sys&type=$seculert_type&filter={'f_0_field':'LastSeen','f_0_data_type':'date','f_0_data_comparison':'gt','f_0_data_value':'$date_back'}&field=FirstSeen&dir=DESC";
+        $json_container_name = 'crime-servers';
+        $json_ip_field_name = 'ip-address';
+		$seculert_api_url = "$securlert_api_url/CrimeServers?api_key=$seculert_api_key&from_date=$from_date&to_date=$to_date";
 	}
 	elsif($seculert_type == 2) {
-		$type_description = 'TIR';
-		$seculert_api_url = "https://portal.seculert.com/getinfo.aspx?key=$seculert_api_key&format=sys&type=$seculert_type&filter={'f_0_field':'Timestamp','f_0_data_type':'date','f_0_data_comparison':'gt','f_0_data_value':'$date_back'}&field=Timestamp&dir=DESC";
+	    $type_description = 'BIR';
+        $json_container_name = 'incidents';
+        $json_ip_field_name = 'source-ip';
+		$seculert_api_url = "$securlert_api_url/BotnetInterception?api_key=$seculert_api_key&from_date=$from_date&to_date=$to_date";
 	}
 
-	
-	# NOTE: this is used sadly instead of WWW::Mechanize OR LWP::Agent
-	# because of the PROXY HTTPS request issue (CONNECT) vs (GET)
-	# Read up on this - it's a huge problem in perl!
-	# 	google: 'lwp proxy Unsupported Request Method and Protocol'
-	# Also, Crypt::SSLeay doesn't seem to work as advertised and
-	# that's one of the few solutions that should work
-	# IF Anyone can figure out how to fix this, please email me: ventz@vpetkov.net
+
+    # See note at bottom on why we have to use lynx vs Perl Module
 	if($proxy) { $ENV{'https_proxy'} = "$proxy_url"; }
-	my @page = `lynx -dump \"$seculert_api_url\"`;
+	my $decoded = decode_json(`lynx -dump \"$seculert_api_url\"`);
+
+    my @servers = @{$decoded->{$json_container_name}};
 
 
-	print "Writing QRadar format...\n";
-	for my $line (@page) {
-		my ($hostname, $ip, $first_seen, $last_seen) = split(/,/, $line);
-		$ip =~ s/"//g; $ip .= '/32';
-        # QRadar remotenet.conf syntax (per IBM support):
-        # 1 - Name
-        # 2 - Sub-Name
-        # 3 - IP Address
-        # 4 - is colour, deprecated
-        # 5 - database length, deprecated
-        # 6 - asset weight, deprecated
-        # 7 - an ID for the 'record' each unique name pair (first 2 columns)    gets an ID
-		print OUT "SECULERT $type_description $ip #FF0000 0 90  29\n";
-	}
+    # QRadar remotenet.conf syntax (per IBM support):
+    # NOTE: this is the "OUT" file.
+    # 1 - Name
+    # 2 - Sub-Name
+    # 3 - IP Address
+    # 4 - is colour, deprecated
+    # 5 - database length, deprecated
+    # 6 - asset weight, deprecated
+    # 7 - an ID for the 'record' each unique name pair (first 2 columns) gets an ID
+
+    print "Writing QRadar format (for: $type_description)...\n";
+    for my $server (@servers) {
+        my $ip = $server->{$json_ip_field_name}.'/32';
+        print OUT "SECULERT $type_description $ip #FF0000 0 90  29\n";
+    }
 }
 
 close(OUT);
@@ -164,12 +184,24 @@ print "Deploying in QRadar...(takes time to complete)\n";
 `ssh -i $qradar_ssh_key -o UserKnownHostsFile=$qradar_ssh_knownhosts -o StrictHostKeyChecking=no root\@$qradar_console /opt/qradar/upgrade/util/setup/upgrades/do_deploy.pl`;
 print "Complete!\n\n";
 
+
 1;
 
 
 
 ########################################################################
-# SEE SSL THROUGH PROXY NOTE above
+# The reason why I use lynx:
+
+# NOTE: this is used sadly instead of WWW::Mechanize OR LWP::Agent
+# because of the PROXY HTTPS request issue (CONNECT) vs (GET)
+# Read up on this - it's a huge problem in perl!
+# 	google: 'lwp proxy Unsupported Request Method and Protocol'
+# Also, Crypt::SSLeay doesn't seem to work as advertised and
+# that's one of the few solutions that should work
+# IF Anyone can figure out how to fix this, please email me: ventz@vpetkov.net
+
+# What I've tried:
+
 
 	#my $mech = WWW::Mechanize->new(ssl_opts => {verify_hostname => 0,});
 	# if($proxy) { $mech->proxy(['http', 'https'], "$proxy_url"); }

@@ -162,6 +162,7 @@ for my $seculert_type (@seculert_types) {
     print "Writing QRadar format (for: $type_description)...\n";
     for my $server (@servers) {
         my $ip = $server->{$json_ip_field_name}.'/32';
+        next if($ip eq "/32");
         print OUT "SECULERT $type_description $ip #FF0000 0 90  29\n";
     }
 }
